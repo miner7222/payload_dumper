@@ -222,6 +222,17 @@ def dump_part(part, payload_file, data_offset, block_size, out_dir, old_dir=None
     
     print("Done")
 
+def diffpartname(dam):
+    diff_partitions = []
+    for part in dam.partitions:
+        for op in part.operations:
+            if op.type in [op.SOURCE_COPY, op.SOURCE_BSDIFF]:
+                diff_partitions.append(part.partition_name)
+                break
+    diff_partitions = list(set(diff_partitions))
+    for partition_name in diff_partitions:
+        print(partition_name)
+
 def main():
     parser = argparse.ArgumentParser(description='OTA payload dumper')
     parser.add_argument('payload_path', type=str,
@@ -234,6 +245,8 @@ def main():
                         help='directory with original images for differential OTA (default: old)')
     parser.add_argument('--images', default="",
                         help='comma-separated list of images to extract (default: all)')
+    parser.add_argument('--diffpartname', action='store_true',
+                        help='dump partition name in diff type payload')
     args = parser.parse_args()
 
     # Ensure output directory exists
@@ -264,19 +277,22 @@ def main():
         dam.ParseFromString(manifest)
         block_size = dam.block_size
 
-        if args.images == "":
-            for part in dam.partitions:
-                dump_part(part, payload_file, data_offset, block_size, args.out, 
-                        args.old if args.diff else None, args.diff)
+        if args.diffpartname:
+            diffpartname(dam)
         else:
-            images = args.images.split(",")
-            for image in images:
-                partition = [part for part in dam.partitions if part.partition_name == image]
-                if partition:
-                    dump_part(partition[0], payload_file, data_offset, block_size, args.out,
+            if args.images == "":
+                for part in dam.partitions:
+                    dump_part(part, payload_file, data_offset, block_size, args.out, 
                             args.old if args.diff else None, args.diff)
-                else:
-                    sys.stderr.write(f"Partition {image} not found in payload!\n")
+            else:
+                images = args.images.split(",")
+                for image in images:
+                    partition = [part for part in dam.partitions if part.partition_name == image]
+                    if partition:
+                        dump_part(partition[0], payload_file, data_offset, block_size, args.out,
+                                args.old if args.diff else None, args.diff)
+                    else:
+                        sys.stderr.write(f"Partition {image} not found in payload!\n")
 
 if __name__ == "__main__":
     main()
